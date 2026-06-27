@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>🌸 花朵消消除</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: linear-gradient(135deg, #fce4ec 0%, #f3e5f5 50%, #e8eaf6 100%);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      min-height: 100vh; font-family: 'Segoe UI', sans-serif;
+      overflow-x: hidden; touch-action: none;
+      -webkit-user-select: none; user-select: none;
+    }
+    #hud {
+      width: 100%; max-width: 490px; padding: 10px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: rgba(255,255,255,0.9); border-radius: 12px;
+      margin-bottom: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .hud-item { text-align: center; flex: 1; }
+    .hud-label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+    .hud-value { font-size: 22px; font-weight: bold; color: #e91e63; }
+    .hud-value.level-val { color: #9c27b0; }
+    #target-bar {
+      width: 100%; max-width: 490px; padding: 6px 16px;
+      margin-bottom: 8px; border-radius: 8px; overflow: hidden;
+      background: rgba(255,255,255,0.7);
+    }
+    #target-bar-label { font-size: 11px; color: #888; margin-bottom: 3px; }
+    #target-bar-track { width: 100%; height: 8px; background: #eee; border-radius: 4px; }
+    #target-bar-fill { height: 100%; width: 0%; border-radius: 4px;
+      background: linear-gradient(90deg, #f48fb1, #e91e63); transition: width 0.3s; }
+    #game-canvas {
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+      display: block;
+    }
+    #items-bar {
+      width: 100%; max-width: 490px; padding: 8px 12px;
+      display: flex; justify-content: center; gap: 12px;
+      background: rgba(255,255,255,0.9); border-radius: 12px;
+      margin-top: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .item-btn {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 6px 14px; border-radius: 10px; cursor: pointer;
+      border: 2px solid transparent; transition: all 0.2s;
+      background: #fff5f8; min-width: 72px;
+    }
+    .item-btn:hover { background: #fce4ec; }
+    .item-btn.active { border-color: #e91e63; background: #fce4ec; box-shadow: 0 0 8px rgba(233,30,99,0.3); }
+    .item-btn.disabled { opacity: 0.4; pointer-events: none; }
+    .item-icon { font-size: 28px; line-height: 1; }
+    .item-count { font-size: 12px; color: #e91e63; font-weight: bold; margin-top: 2px; }
+    .item-name { font-size: 10px; color: #999; margin-top: 1px; }
+    #overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      display: none; align-items: center; justify-content: center;
+      z-index: 100; pointer-events: none;
+    }
+    #overlay.show { display: flex; pointer-events: auto; }
+    #overlay-box {
+      background: rgba(0,0,0,0.75); color: #fff; padding: 30px 40px;
+      border-radius: 16px; text-align: center; font-size: 20px;
+      line-height: 1.6; min-width: 260px;
+    }
+    #overlay-box .big { font-size: 28px; font-weight: bold; }
+    #overlay-box .sub { font-size: 14px; color: #ccc; margin-top: 12px; }
+    #overlay-box button {
+      margin-top: 16px; padding: 10px 28px; border: none;
+      border-radius: 8px; background: #e91e63; color: #fff;
+      font-size: 16px; cursor: pointer; font-weight: bold;
+    }
+    #overlay-box button:hover { background: #c2185b; }
+    #combo-popup {
+      position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 48px; font-weight: 900; color: #e91e63;
+      text-shadow: 0 2px 8px rgba(233,30,99,0.4);
+      pointer-events: none; opacity: 0; transition: opacity 0.3s;
+    }
+    #combo-popup.show { opacity: 1; }
+    .top-btn {
+      position: fixed; top: 12px; font-size: 24px;
+      cursor: pointer; opacity: 0.6; transition: opacity 0.2s; z-index: 10;
+    }
+    .top-btn:hover { opacity: 1; }
+    #sound-toggle { right: 12px; }
+    #help-btn { right: 50px; }
+
+    /* ========== 帮助弹窗 ========== */
+    #help-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6); z-index: 200;
+      display: none; align-items: center; justify-content: center;
+      -webkit-user-select: auto; user-select: auto;
+      touch-action: auto;
+    }
+    #help-overlay.show { display: flex; }
+    #help-panel {
+      background: #fff; border-radius: 16px; width: 92%; max-width: 440px;
+      max-height: 85vh; overflow-y: auto; padding: 24px;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.3);
+      color: #333; font-size: 14px; line-height: 1.7;
+    }
+    #help-panel h1 { font-size: 22px; text-align: center; color: #e91e63; margin-bottom: 16px; }
+    #help-panel h2 {
+      font-size: 16px; color: #9c27b0; margin: 18px 0 8px;
+      padding-bottom: 4px; border-bottom: 2px solid #f3e5f5;
+    }
+    #help-panel h3 { font-size: 14px; color: #e91e63; margin: 12px 0 4px; }
+    #help-panel table {
+      width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px;
+    }
+    #help-panel th { background: #fce4ec; padding: 6px 8px; text-align: left; font-weight: 600; }
+    #help-panel td { padding: 5px 8px; border-bottom: 1px solid #f5f5f5; }
+    #help-panel ul { padding-left: 20px; margin: 6px 0; }
+    #help-panel li { margin: 3px 0; }
+    #help-panel .tip {
+      background: #fff8e1; border-left: 3px solid #ffc107;
+      padding: 8px 12px; margin: 10px 0; border-radius: 0 8px 8px 0;
+      font-size: 13px;
+    }
+    #help-panel .item-demo {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #fff5f8; padding: 4px 10px; border-radius: 8px;
+      margin: 4px 2px; font-size: 13px;
+    }
+    #help-close {
+      display: block; margin: 20px auto 0; padding: 10px 36px;
+      border: none; border-radius: 8px; background: #e91e63; color: #fff;
+      font-size: 16px; cursor: pointer; font-weight: bold;
+    }
+    #help-close:hover { background: #c2185b; }
+    #help-panel::-webkit-scrollbar { width: 6px; }
+    #help-panel::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div class="top-btn" id="help-btn" onclick="toggleHelp()">❓</div>
+  <div class="top-btn" id="sound-toggle" onclick="toggleSound()">🔊</div>
+
+  <div id="hud">
+    <div class="hud-item"><div class="hud-label">关卡</div><div class="hud-value level-val" id="hud-level">1</div></div>
+    <div class="hud-item"><div class="hud-label">分数</div><div class="hud-value" id="hud-score">0</div></div>
+    <div class="hud-item"><div class="hud-label">连击</div><div class="hud-value" id="hud-combo">0</div></div>
+    <div class="hud-item"><div class="hud-label">步数</div><div class="hud-value" id="hud-moves">30</div></div>
+  </div>
+  <div id="target-bar">
+    <div id="target-bar-label">目标: <span id="target-score">1000</span> 分</div>
+    <div id="target-bar-track"><div id="target-bar-fill"></div></div>
+  </div>
+  <canvas id="game-canvas"></canvas>
+  <div id="items-bar">
+    <div class="item-btn" id="btn-bomb" onclick="onItemBtn('bomb')">
+      <div class="item-icon">💣</div><div class="item-count" id="cnt-bomb">1</div><div class="item-name">炸弹</div>
+    </div>
+    <div class="item-btn" id="btn-copy" onclick="onItemBtn('copy')">
+      <div class="item-icon">📋</div><div class="item-count" id="cnt-copy">1</div><div class="item-name">复制</div>
+    </div>
+    <div class="item-btn" id="btn-shovel" onclick="onItemBtn('shovel')">
+      <div class="item-icon">🪓</div><div class="item-count" id="cnt-shovel">1</div><div class="item-name">铲除</div>
+    </div>
+  </div>
+  <div id="combo-popup"></div>
+  <div id="overlay"><div id="overlay-box"></div></div>
+
+  <!-- ========== 帮助弹窗 ========== -->
+  <div id="help-overlay">
+    <div id="help-panel">
+      <h1>🌸 花朵消消除</h1>
+
+      <h2>🎯 游戏目标</h2>
+      <p>在有限步数内，交换相邻花朵使 <b>3 朵及以上相同花朵</b>连成一线来消除，达到目标分数即可过关。</p>
+
+      <h2>🕹️ 基本操作</h2>
+      <table>
+        <tr><th>操作</th><th>方式</th></tr>
+        <tr><td>选中花朵</td><td>点击一朵花，出现粉色选中框</td></tr>
+        <tr><td>交换花朵</td><td>选中后再点击相邻花朵，或直接拖拽到相邻位置</td></tr>
+        <tr><td>取消选中</td><td>点击已选中的花朵，或点击非相邻位置</td></tr>
+      </table>
+      <div class="tip">💡 只能交换上下左右相邻的花朵，不能斜向交换。交换后必须形成三消才能成功，否则自动换回。</div>
+
+      <h2>🌺 花朵种类</h2>
+      <p>
+        <span class="item-demo">🌹 玫瑰</span>
+        <span class="item-demo">🌻 向日葵</span>
+        <span class="item-demo">🌷 郁金香</span>
+        <span class="item-demo">🌼 雏菊</span>
+        <span class="item-demo">🌺 木槿</span>
+        <span class="item-demo">🌸 樱花</span>
+      </p>
+      <p>前两关使用 5 种花朵，第三关起增加至 6 种，难度递增。</p>
+
+      <h2>💥 消除与连击</h2>
+      <ul>
+        <li><b>三消</b>：3 朵相同花朵横/竖连线 → 消除</li>
+        <li><b>四消及以上</b>：连线越长，分数越高</li>
+        <li><b>连锁反应</b>：消除后花朵下落+新花填充，若再次形成三消则自动连锁</li>
+        <li><b>连击倍率</b>：每次连锁 combo +1，分数 = 花朵数 × 10 × 连击数</li>
+      </ul>
+
+      <h2>🧪 道具系统</h2>
+      <p>每关开始获得一定数量道具，点击底部道具栏激活，<b>道具不消耗步数</b>。</p>
+
+      <h3>💣 炸弹</h3>
+      <p>消除以目标为中心 <b>3×3 范围</b>内所有花朵（最多 9 朵）。</p>
+      <p>使用：点击「💣 炸弹」→ 点击棋盘目标位置</p>
+      <div class="tip">🎯 适合清除密集区域，一次大量消除得高分。</div>
+
+      <h3>📋 复制</h3>
+      <p>将一朵花的类型复制到另一朵上，使目标变为与源相同。</p>
+      <p>使用：点击「📋 复制」→ 点击源花朵（紫色虚线框）→ 点击目标花朵</p>
+      <div class="tip">🎯 差一朵就能连线时使用复制，主动制造三消。</div>
+
+      <h3>🪓 铲除</h3>
+      <p>直接移除一朵花，上方花朵下落填补空位。</p>
+      <p>使用：点击「🪓 铲除」→ 点击要移除的花朵</p>
+      <div class="tip">🎯 移除"挡路"的花朵，让关键花朵落到合适位置。</div>
+
+      <h2>🏔️ 关卡一览</h2>
+      <table>
+        <tr><th>关卡</th><th>名称</th><th>目标</th><th>步数</th><th>💣</th><th>📋</th><th>🪓</th><th>花种</th></tr>
+        <tr><td>1</td><td>🌸 春日花园</td><td>1,000</td><td>30</td><td>1</td><td>1</td><td>1</td><td>5种</td></tr>
+        <tr><td>2</td><td>🌻 夏日花海</td><td>2,000</td><td>28</td><td>1</td><td>1</td><td>2</td><td>5种</td></tr>
+        <tr><td>3</td><td>🍂 秋日花径</td><td>3,500</td><td>26</td><td>2</td><td>1</td><td>1</td><td>6种</td></tr>
+        <tr><td>4</td><td>❄️ 冬日花房</td><td>5,000</td><td>24</td><td>2</td><td>2</td><td>2</td><td>6种</td></tr>
+        <tr><td>5</td><td>🌈 四季花园</td><td>7,000</td><td>22</td><td>2</td><td>2</td><td>2</td><td>6种</td></tr>
+      </table>
+
+      <h2>💡 新手技巧</h2>
+      <ul>
+        <li>优先寻找四消和五消 — 一次消除越多，分数越高</li>
+        <li>利用连锁反应 — 观察下落后可能产生的新匹配</li>
+        <li>炸弹留到关键时刻 — 不要在简单三消就能解决时浪费</li>
+        <li>复制比铲除更灵活 — 复制可以主动创造三消</li>
+        <li>从底部消除 — 底部消除后上方花朵下落，更容易触发连锁</li>
+        <li>注意步数 — 每次交换消耗 1 步，道具不消耗步数</li>
+      </ul>
+
+      <button id="help-close" onclick="toggleHelp()">知道了！</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
